@@ -1,0 +1,50 @@
+name: fraud-investigation-env
+version: 1.0.0
+description: >
+  RL environment where LLM agents learn to detect financial fraud.
+  Covers credit card fraud, account takeovers, and organized fraud networks.
+
+author: khushiks21
+repository: https://huggingface.co/spaces/khushiks21/fraud-investigation-env
+
+tasks:
+    - id: task_easy
+      name: Credit Card Fraud Detection
+      difficulty: easy
+      description: >
+        Detect fraud from a single transaction combined with account history.
+        Cases include geographic impossibility, velocity fraud, card-not-present fraud,
+        and legitimate edge cases.
+      reward_range: [0.0, 1.0]
+      avg_steps: 1
+
+    - id: task_medium
+      name: Account Takeover Detection
+      difficulty: medium
+      description: >
+        Detect account compromise from login events and behavioral signals.
+        Cases include device takeover, credential stuffing, SIM swap attacks,
+        and legitimate new device scenarios.
+      reward_range: [0.0, 1.0]
+      avg_steps: 1
+
+    - id: task_hard
+      name: Fraud Network Investigation
+      difficulty: hard
+      description: >
+        Detect coordinated fraud across multiple linked accounts.
+        Cases include money mule networks, bust-out fraud rings,
+        and legitimate business account activity.
+      reward_range: [0.0, 1.0]
+      avg_steps: 1
+
+server:
+  port: 8000
+  host: 0.0.0.0
+  workers: 2
+
+api:
+  reset: POST /reset
+  step:  POST /step
+  state: GET  /state
+  health: GET /health
