@@ -16,7 +16,7 @@ tasks:
         Cases include geographic impossibility, velocity fraud, card-not-present fraud,
         and legitimate edge cases.
       reward_range: [0.0, 1.0]
-      avg_steps: 1
+      avg_steps: 2
 
     - id: task_medium
       name: Account Takeover Detection
@@ -26,7 +26,7 @@ tasks:
         Cases include device takeover, credential stuffing, SIM swap attacks,
         and legitimate new device scenarios.
       reward_range: [0.0, 1.0]
-      avg_steps: 1
+      avg_steps: 2
 
     - id: task_hard
       name: Fraud Network Investigation
@@ -36,12 +36,12 @@ tasks:
         Cases include money mule networks, bust-out fraud rings,
         and legitimate business account activity.
       reward_range: [0.0, 1.0]
-      avg_steps: 1
+      avg_steps: 2
 
 server:
   port: 8000
   host: 0.0.0.0
-  workers: 2
+  workers: 1
 
 api:
   reset: POST /reset
