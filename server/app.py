@@ -113,3 +113,11 @@ def list_tasks():
             }
         ]
     }
+
+@app.post("/close")
+def close():
+    try:
+        env.close()
+        return {"status": "closed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
