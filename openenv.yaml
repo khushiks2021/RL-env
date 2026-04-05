@@ -48,3 +48,5 @@ api:
   step:  POST /step
   state: GET  /state
   health: GET /health
+  close: POST /close
+
