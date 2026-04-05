@@ -9,6 +9,7 @@ def _match_signals(agent_signals: list[str], truth_signals: list[str]) -> int:
     If ≥50% of words in a truth signal appear in any agent signal → match
     """
     matched = 0
+
     for truth_sig in truth_signals:
         truth_words = set(truth_sig.lower().replace("_", " ").split())
 
@@ -48,6 +49,8 @@ def grade(action: FraudAction, truth: dict, task: str) -> tuple[float, str]:
         return _grade_task2(action, truth)
     elif task == "task_hard":
         return _grade_task3(action, truth)
+
+    return 0.0, "Unknown task"
 
 
 def _grade_task1(action: FraudAction, truth: dict) -> tuple[float, str]:
@@ -95,6 +98,13 @@ def _grade_task2(action: FraudAction, truth: dict) -> tuple[float, str]:
 
     if action.is_fraud == truth["is_fraud"]:
         reward += 0.25
+    elif not action.is_fraud and truth["is_fraud"]:
+        reward -= 0.10
+        feedback.append("MISSED: This was fraud (-0.10)")
+
+    if action.fraud_type == truth["fraud_type"]:
+        reward += 0.10
+        feedback.append("CORRECT: Fraud type (+0.10)")
 
     if _fuzzy_match(action.attack_vector, truth["attack_vector"]):
         reward += 0.20
@@ -127,6 +137,9 @@ def _grade_task3(action: FraudAction, truth: dict) -> tuple[float, str]:
 
     if action.is_fraud == truth["is_fraud"]:
         reward += 0.20
+    elif not action.is_fraud and truth["is_fraud"]:
+        reward -= 0.10
+        feedback.append("MISSED: This was fraud (-0.10)")
 
     if action.fraud_type == truth["fraud_type"]:
         reward += 0.15

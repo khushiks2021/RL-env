@@ -3,20 +3,21 @@ import uuid
 import sys
 import os
 
-# Make sure models can be imported from parent
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import FraudAction, FraudObservation, FraudState
 from server.case_generator import get_case
 from server.grader import grade
 
+MAX_STEPS = 2  # step 1: investigate, step 2: submit_decision
+
 
 class FraudEnvironment:
 
     def __init__(self):
-        # Episode state — one environment instance per session
-        self.current_case = None   # full case dict {observation, truth}
-        self.current_task = None   # which task is running
+        self.current_case = None
+        self._full_obs = None   # stores full observation for step 2 reveal
+        self.current_task = None
         self.episode_id = None
         self.step_count = 0
         self.total_reward = 0.0
@@ -26,16 +27,10 @@ class FraudEnvironment:
     # RESET — start a new episode
     # ─────────────────────────────────────────
     def reset(self, task: str = "task_easy") -> FraudObservation:
-        """
-        Called at the start of every episode.
-        Picks a new fraud case and returns the first observation.
-        """
-        # Validate task name
         valid_tasks = ["task_easy", "task_medium", "task_hard"]
         if task not in valid_tasks:
             raise ValueError(f"Invalid task '{task}'. Choose from {valid_tasks}")
 
-        # Generate a fresh case
         self.current_case = get_case(task)
         self.current_task = task
         self.episode_id = str(uuid.uuid4())
@@ -43,58 +38,102 @@ class FraudEnvironment:
         self.total_reward = 0.0
         self.is_done = False
 
-        # Return the first observation (no reward yet, agent hasn't acted)
-        obs = self.current_case["observation"]
-        obs.step = 0
-        obs.reward = 0.0
-        obs.done = False
-        obs.feedback = "New case loaded. Analyze the evidence and submit your decision."
+        full = self.current_case["observation"]
+        self._full_obs = full
 
-        return obs
+        # Return PARTIAL observation — account + transactions only
+        # Login events, account events, linked accounts, and signals are hidden
+        # Agent must call action_type="investigate" to reveal them
+        return FraudObservation(
+            case_id=full.case_id,
+            task=full.task,
+            step=0,
+            account=full.account,
+            transactions=full.transactions,
+            login_events=[],
+            account_events=[],
+            linked_accounts=[],
+            additional_signals={},
+            reward=0.0,
+            done=False,
+            feedback=(
+                "Step 1 of 2: You see account profile and transactions. "
+                "Call action_type='investigate' to reveal login events, "
+                "account changes, linked accounts and system signals. "
+                "Then submit your final decision."
+            )
+        )
 
     # ─────────────────────────────────────────
-    # STEP — agent submits a decision
+    # STEP — agent acts
     # ─────────────────────────────────────────
     def step(self, action: FraudAction) -> FraudObservation:
-        """
-        Agent submits their fraud analysis decision.
-        Environment grades it and returns reward + feedback.
-        This is a single-step environment (one decision per case).
-        """
         if self.is_done:
             raise RuntimeError("Episode is done. Call reset() to start a new one.")
 
         if self.current_case is None:
             raise RuntimeError("No active episode. Call reset() first.")
 
-        # Grade the action
+        self.step_count += 1
+        full = self._full_obs
+
+        # Step 1: investigate → reveal full data (no grading yet)
+        if action.action_type == "investigate" and self.step_count == 1:
+            return FraudObservation(
+                case_id=full.case_id,
+                task=full.task,
+                step=self.step_count,
+                account=full.account,
+                transactions=full.transactions,
+                login_events=full.login_events,
+                account_events=full.account_events,
+                linked_accounts=full.linked_accounts,
+                additional_signals=full.additional_signals,
+                reward=0.0,
+                done=False,
+                feedback=(
+                    "Step 2 of 2: Full data revealed — login events, account changes, "
+                    "linked accounts and system signals are now visible. "
+                    "Submit your final decision with action_type='submit_decision'."
+                )
+            )
+
+        # Final step: grade the decision
         truth = self.current_case["truth"]
         reward, feedback = grade(action, truth, self.current_task)
 
-        # Update internal state
-        self.step_count += 1
         self.total_reward += reward
-        self.is_done = True   # one decision per case (can extend to multi-step)
+        self.is_done = True
 
-        # Build response observation
-        obs = self.current_case["observation"]
-        obs.step = self.step_count
-        obs.reward = reward
-        obs.done = self.is_done
-        obs.feedback = feedback
-
-        return obs
+        return FraudObservation(
+            case_id=full.case_id,
+            task=full.task,
+            step=self.step_count,
+            account=full.account,
+            transactions=full.transactions,
+            login_events=full.login_events,
+            account_events=full.account_events,
+            linked_accounts=full.linked_accounts,
+            additional_signals=full.additional_signals,
+            reward=reward,
+            done=True,
+            feedback=feedback
+        )
 
     # ─────────────────────────────────────────
-    # STATE — internal state snapshot
+    # STATE / CLOSE
     # ─────────────────────────────────────────
     def state(self) -> FraudState:
-        """Returns current internal state of the environment."""
         return FraudState(
             episode_id=self.episode_id or "no_episode",
             task=self.current_task or "none",
-            case_id=self.current_case["observation"].case_id if self.current_case else "none",
+            case_id=self._full_obs.case_id if self._full_obs else "none",
             step_count=self.step_count,
             total_reward=self.total_reward,
             is_complete=self.is_done
         )
+
+    def close(self):
+        self.current_case = None
+        self._full_obs = None
+        self.is_done = True

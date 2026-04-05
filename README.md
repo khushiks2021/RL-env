@@ -1,5 +1,16 @@
-
-
+---
+title: Fraud Investigation Env
+emoji: 🕵️
+colorFrom: red
+colorTo: orange
+sdk: docker
+app_port: 8000
+pinned: false
+tags:
+  - openenv
+  - reinforcement-learning
+  - fraud-detection
+---
 # Fraud Investigation RL Environment
 
 An OpenEnv-compatible reinforcement learning environment where LLM agents learn to detect financial fraud across three progressively harder tasks.
