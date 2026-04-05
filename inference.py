@@ -174,56 +174,68 @@ def _make_action(data: dict, action_type: str) -> FraudAction:
 # Episode runner — 2-step RL loop
 # ─────────────────────────────────────────
 def run_episode(env: FraudEnvClient, task: str, episode_num: int) -> float:
-    # ── Reset ──────────────────────────────
-    obs = env.reset(task=task)
-    print(f"[START] task={task} env={ENV_NAME} model={MODEL_NAME}")
+      obs = env.reset(task=task)
+      print(f"[START] task={task} env={ENV_NAME} model={MODEL_NAME}")
 
-    error1 = "null"
-    error2 = "null"
+      step_rewards = []
+      error1 = "null"
+      error2 = "null"
+      success = True
 
-    # ── Step 1: investigate ────────────────
-    try:
-        prompt1 = build_step1_prompt(obs.model_dump())
-        data1   = call_llm(STEP1_SYSTEM, prompt1, max_tokens=300)
-        hyp     = _make_action(data1, "investigate")
-        obs2    = env.step(hyp)
-        hyp_str = f"investigate(hyp={'fraud' if hyp.is_fraud else 'legit'},type={hyp.fraud_type})"
-    except Exception as e:
-        error1 = str(e)[:60]
-        hyp    = _make_action(_safe_default(), "investigate")
-        hyp_str = "investigate(error)"
-        try:
-            obs2 = env.step(hyp)
-        except Exception:
-            print(f"[STEP] step=1 action={hyp_str} reward=0.00 done=false error={error1}")
-            print(f"[END] success=false steps=1 rewards=0.00")
-            return 0.0
+      # Step 1: investigate
+      try:
+          prompt1 = build_step1_prompt(obs.model_dump())
+          data1   = call_llm(STEP1_SYSTEM, prompt1, max_tokens=300)
+          hyp     = _make_action(data1, "investigate")
+          obs2    = env.step(hyp)
+          hyp_str = f"investigate(hyp={'fraud' if hyp.is_fraud else 'legit'},type={hyp.fraud_type})"
+      except Exception as e:
+          error1  = str(e)[:60]
+          success = False
+          hyp     = _make_action(_safe_default(), "investigate")
+          hyp_str = "investigate(error)"
+          try:
+              obs2 = env.step(hyp)
+          except Exception:
+              step_rewards.append(0.0)
+              print(f"[STEP] step=1 action={hyp_str} reward=0.00 done=false error={error1}")
+              env.close()
+              rewards_str = ",".join(f"{r:.2f}" for r in step_rewards)
+              print(f"[END] success=false steps=1 rewards={rewards_str}")
+              return 0.0
 
-    print(f"[STEP] step=1 action={hyp_str} reward=0.00 done=false error={error1}")
-    time.sleep(1)   # small pause between LLM calls
+      step_rewards.append(0.0)
+      print(f"[STEP] step=1 action={hyp_str} reward=0.00 done=false error={error1}")
+      time.sleep(1)
 
-    # ── Step 2: submit_decision ────────────
-    try:
-        prompt2 = build_step2_prompt(obs2.model_dump(), hyp)
-        data2   = call_llm(STEP2_SYSTEM, prompt2, max_tokens=512)
-        final   = _make_action(data2, "submit_decision")
-        result  = env.step(final)
-        reward  = result.reward
-        act_str = (
-            f"submit_decision(fraud={'true' if final.is_fraud else 'false'},"
-            f"type={final.fraud_type},"
-            f"act={final.action},"
-            f"conf={final.confidence:.2f})"
-        )
-    except Exception as e:
-        error2 = str(e)[:60]
-        reward  = 0.0
-        act_str = "submit_decision(error)"
+      # Step 2: submit_decision
+      try:
+          prompt2 = build_step2_prompt(obs2.model_dump(), hyp)
+          data2   = call_llm(STEP2_SYSTEM, prompt2, max_tokens=512)
+          final   = _make_action(data2, "submit_decision")
+          result  = env.step(final)
+          reward  = result.reward
+          act_str = (
+              f"submit_decision(fraud={'true' if final.is_fraud else 'false'},"
+              f"type={final.fraud_type},"
+              f"act={final.action},"
+              f"conf={final.confidence:.2f})"
+          )
+      except Exception as e:
+          error2  = str(e)[:60]
+          success = False
+          reward  = 0.0
+          act_str = "submit_decision(error)"
 
-    print(f"[STEP] step=2 action={act_str} reward={reward:.2f} done=true error={error2}")
-    print(f"[END] success={'true' if error2 == 'null' else 'false'} steps=2 rewards={reward:.2f}")
-    print()
-    return reward
+      step_rewards.append(reward)
+      print(f"[STEP] step=2 action={act_str} reward={reward:.2f} done=true error={error2}")
+
+      env.close()
+      rewards_str = ",".join(f"{r:.2f}" for r in step_rewards)
+      print(f"[END] success={'true' if success else 'false'} steps=2 rewards={rewards_str}")
+      print()
+      return reward
+
 
 
 # ─────────────────────────────────────────
