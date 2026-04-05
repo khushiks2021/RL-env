@@ -11,13 +11,11 @@ def get_case(task: str, case_id: str = None) -> dict:
             _case_geo_impossible,
             _case_velocity_fraud,
             _case_legitimate_traveler,
-            _case_card_not_present,
         ]
     elif task == "task_medium":
         cases = [
             _case_device_takeover,
             _case_credential_stuffing,
-            _case_sim_swap,
             _case_legitimate_new_device,
         ]
     elif task == "task_hard":
