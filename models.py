@@ -6,6 +6,7 @@ from typing import Optional
 # ACTION — what the LLM agent decides
 # ─────────────────────────────────────────
 class FraudAction(BaseModel):
+    action_type: Optional[str] = "submit_decision"  # "investigate" | "submit_decision"
     is_fraud: bool  # True = fraud, False = legitimate
     fraud_type: str  # "card_fraud" | "account_takeover" | "money_mule" | "bust_out" | "legitimate"
     confidence: float  # 0.0 to 1.0 — how sure is the agent
