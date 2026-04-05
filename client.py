@@ -61,3 +61,13 @@ class FraudEnvClient:
         )
         res.raise_for_status()
         return res.json()["tasks"]
+
+    def close(self):
+        """Best-effort close. Never raises."""
+        try:
+            requests.post(
+                f"{self.base_url}/close",
+                timeout=10
+            )
+        except Exception:
+            pass
